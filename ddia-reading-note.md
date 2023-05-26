@@ -136,13 +136,15 @@ This data structure is mostly a self-contained *document*, JSON representation c
 The JSON representation has better locality than the multi-table schema. (One query, no join)
 JSON representation makes this tree structure explicit。
 
-#### Many-to-One and Many-to-Many Relationships
+##### Many-to-One and Many-to-Many Relationships
 
 Benefits of standardized lists of geographic regions and drop-down list for user
 
-- Consistent. Avoiding ambiguity (e.g.same name)
-- Ease of updating. Localization support
-- Better search
+1. Consistent style and spelling
+2. Avoiding ambiguity (e.g.same name)
+3. Ease of updating
+4. Localization support (language)
+5. Better search
 
 Stores ID VS Stores text
 
@@ -160,7 +162,7 @@ If DB doesn't support, need application supports. (slow-changing, small, can fit
 
 Besides data has a tendency of becoming more interconnected
 
-#### Are Document Databases Repeating History?
+##### Are Document Databases Repeating History?
 
 *Hierarchical model* -> *relational model* and *network model*
 
@@ -188,7 +190,7 @@ Query optimizers are complicated beasts. But it only need to build once and all 
 Document DB, like hierarchical, stores one-to-many
 But for many-to-one and many-to-many, relational and document DB are quite similar, they both use *foreign key* (called *document reference* in document model
 
-#### Relational Versus Document Databases Today
+##### Relational Versus Document Databases Today
 
 **Which leads to simple application code?**
 
@@ -207,7 +209,7 @@ In many-to-many case, since you can't join, application has to renormalize, and 
 
 interconnection
 
-| interconnection | low      | high       | very high |
+| Interconnection | low      | high       | very high |
 | --------------- | -------- | ---------- | --------- |
 | suggestion      | document | relational | graph     |
 
@@ -246,8 +248,8 @@ Document supports join
 
 |                   | imperative query                      | declarative query                                            |
 | ----------------- | ------------------------------------- | ------------------------------------------------------------ |
-| def               | How to do it step by step             | What's the pattern of the result                             |
-| example           | Gremlin                               | SQL, css, cypher                                             |
+| Def.              | How to do it step by step             | What's the pattern of the result                             |
+| Example           | Gremlin                               | SQL, css, cypher                                             |
 | Execution         | strictly defined                      | hide execution details: DB can improve without changing the queries |
 |                   | Changing ordering may break the query | Order of data is not guaranteed and doesn't matter           |
 | Parallelizability | Hard                                  | Easier                                                       |
@@ -271,4 +273,50 @@ Restrictions:
 
 Thus they can be run in any order, and rerun on failure
 
-Notice: SQL can distribute, MapReduce can single machine. Some SQL can be distributed without using MapReduce. Some SQL DB can run JavaSript function too
+Notice: SQL can distribute. MapReduce can single machine. Some SQL can be distributed without using MapReduce. Some SQL DB can run JavaScript function too
+
+Usability problem:
+Writing those two coordinated functions is harder than a single query
+
+(MongoDB supported declarative query language, JSON-based syntax, but may accidentally reinventing SQL)
+
+
+
+#### Graph-Like Data Models
+
+Use cases: social network, web network, road or rail networks
+
+Algorithms: shortest path, PageRank for web graph
+
+Types
+
+- *property graph* model (Neo4j, Titan)
+- *triple-store* model (Datomic, AllegroGraph)
+
+##### Property Graphs
+
+- Vertex: UID, outgoing edge, incoming edge, properties (K-V pairs)
+- Edge: UID, tail vertex, head vertex, relationship, properties (K-V pairs)
+
+Can be represented in a relational schema
+
+Good flexibility. for example:
+France uses region US use states
+Different granularity, when an item sometime specified as city, sometime as states
+
+##### The Cypher Query Language
+
+Declarative
+
+Executing plan can be various
+
+##### Graph Queries in SQL
+
+Can we query graph like SQL? Yes but difficult
+
+Because the number of joins is not fixed. You don't know which table to join in advance
+
+(SQL: use WITH RECURSIVE, 29 lines, Cypher: 4 lines)
+
+**Triple-Stores and SPARQL**
+
