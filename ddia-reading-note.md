@@ -4,13 +4,13 @@
 
 
 
-## PART I. Foundations of Data Systems
+# PART I. Foundations of Data Systems
 
-### Chapter 1. Reliable, Scalable, and Maintainable Applications
+## Chapter 1. Reliable, Scalable, and Maintainable Applications
 
 Many applications today are data-intensive, as opposed to compute-intensive
 
-#### Reliability
+### Reliability
 
 Fault and failure: System need to be fault-tolerance
 
@@ -43,7 +43,7 @@ Fault and failure: System need to be fault-tolerance
   - Monitoring
   - Management and training
 
-#### Scalability
+### Scalability
 
   It's not a label: "X is scalable" or "Y doesn't scale". But rather "If the system grows in a particular way, what are the options"
   **Describing Load**
@@ -100,7 +100,7 @@ Advices:
 - Depends on load parameter assumption. If they are wrong, wasted or counterproductive
   Early stage, future load are still hypothetical, product feature quick iteration is usually more important
 
-#### Maintainability
+### Maintainability
 
 **Operability**: Making Life Easy for Operations
 
@@ -115,8 +115,8 @@ One of the best tools we have for removing *accidental complexity* is *abstracti
 Agile, test-driven development
 
 
-### CHAPTER 2. Data Models and Query Languages
-#### Relational Model Versus Document Model
+## Chapter 2. Data Models and Query Languages
+### Relational Model Versus Document Model
 NoSQL: why born? Because scalability / open source over commercial / specialized query / flexible schema and expressive data model
 
 *polyglot persistence*
@@ -136,7 +136,7 @@ This data structure is mostly a self-contained *document*, JSON representation c
 The JSON representation has better locality than the multi-table schema. (One query, no join)
 JSON representation makes this tree structure explicit。
 
-##### Many-to-One and Many-to-Many Relationships
+#### Many-to-One and Many-to-Many Relationships
 
 Benefits of standardized lists of geographic regions and drop-down list for user
 
@@ -162,7 +162,7 @@ If DB doesn't support, need application supports. (slow-changing, small, can fit
 
 Besides data has a tendency of becoming more interconnected
 
-##### Are Document Databases Repeating History?
+#### Are Document Databases Repeating History?
 
 *Hierarchical model* -> *relational model* and *network model*
 
@@ -190,7 +190,7 @@ Query optimizers are complicated beasts. But it only need to build once and all 
 Document DB, like hierarchical, stores one-to-many
 But for many-to-one and many-to-many, relational and document DB are quite similar, they both use *foreign key* (called *document reference* in document model
 
-##### Relational Versus Document Databases Today
+#### Relational Versus Document Databases Today
 
 **Which leads to simple application code?**
 
@@ -244,7 +244,7 @@ Relational supports XML, JSON
 
 Document supports join
 
-#### Query Languages for Data
+### Query Languages for Data
 
 |                   | imperative query                      | declarative query                                            |
 | ----------------- | ------------------------------------- | ------------------------------------------------------------ |
@@ -282,7 +282,7 @@ Writing those two coordinated functions is harder than a single query
 
 
 
-#### Graph-Like Data Models
+### Graph-Like Data Models
 
 Use cases: social network, web network, road or rail networks
 
@@ -293,7 +293,7 @@ Types
 - *property graph* model (Neo4j, Titan)
 - *triple-store* model (Datomic, AllegroGraph)
 
-##### Property Graphs
+#### Property Graphs
 
 - Vertex: UID, outgoing edge, incoming edge, properties (K-V pairs)
 - Edge: UID, tail vertex, head vertex, relationship, properties (K-V pairs)
@@ -304,13 +304,13 @@ Good flexibility. for example:
 France uses region US use states
 Different granularity, when an item sometime specified as city, sometime as states
 
-##### The Cypher Query Language
+#### The Cypher Query Language
 
 Declarative
 
 Executing plan can be various
 
-##### Graph Queries in SQL
+#### Graph Queries in SQL
 
 Can we query graph like SQL? Yes but difficult
 
@@ -318,5 +318,90 @@ Because the number of joins is not fixed. You don't know which table to join in 
 
 (SQL: use WITH RECURSIVE, 29 lines, Cypher: 4 lines)
 
-**Triple-Stores and SPARQL**
+#### Triple-Stores and SPARQL
+
+（subject, predicate, object) e.g. (Jim, likes, bananas),
+
+- (lucy, age, 33) like the vertex with property
+
+- (lucy, marriedTo, alain) likes the vertex - edge - vertex
+
+*Turtle format*
+
+**The semantic web and RDF**
+
+Triple-store is independent of the semantic web
+
+"semantic web": website publish info as machine-readable data: Resource Description Framework "RDF". Overhyped in the early 2000s
+
+RDF: use URI to avoid conflicts. 
+(Design for combining with someone else’s data, same word “within” may refer to different things)
+
+**The SPARQL query language**
+
+Predates Cypher
+RDF doesn’t distinguish between properties and edges but just uses predicates for both
+
+**Graph Databases Compared to the Network Model**
+
+Are Graph DB CODASYL in disguise? No
+
+- CODASYL has schema. Graph doesn't
+- CODASYL, only way to reach record was to traverse one path. Graph has UID
+- CODASYL children of record is ordered. Graph is not
+- CODASYL, all queries were imperative. Graph supports declarative query like Cypher, SPARQL
+
+#### The Foundation: Datalog
+Datalog is much older, provides the foundation that later query languages build upon.
+*predicate(subject, object)*
+
+Rules, like function calls, can be recursive, can be combined and reused
+
+### Summary
+
+History - hierarchical model
+
+SQL - Relational model
+
+NoSQL
+
+- Document model
+- Graph model
+
+But there are still many other data models
+
+- Genome: need sequence similarity searches on very  long string (DNA molecule). Similar but identical. Genome DB like GenBank
+- Particle Physicists: Large Hadron Collider (LHC) hundreds of petabytes. Custom solutions are required for controllable hardware cost
+- Full-text search
+
+## Chapter 3: Storage and Retrieval
+
+Two families of storage engines: *log-structured* storage engines, and *page-oriented* storage engines such as B-trees.
+
+### Data Structures That Power Your Database
+
+Simplist: key value store with plain text, or value can be JSON
+
+```
+123456 '{"name":"London","attractions":["Big Ben","London Eye"]}'
+```
+
+(Real database use a *log* too, just with concurrency control and so on. Different from *application log*, this is more general:"append-only sequence of records")
+
+- Good performance on write. Appending file is efficient
+
+- Bad performance on read. O(n)
+
+**Index**
+
+- Additional structure. Doesn’t affect the contents, only affects performance of queries. 
+- Incurs overhead, especially on writes. 
+
+Important trade-off
+
+#### Hash Indexes
+
+
+
+#### SSTables and LSM-Trees
 
