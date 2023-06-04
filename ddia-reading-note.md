@@ -320,11 +320,11 @@ Because the number of joins is not fixed. You don't know which table to join in 
 
 #### Triple-Stores and SPARQL
 
-（subject, predicate, object) e.g. (Jim, likes, bananas),
+*(subject, predicate, object)* e.g. `(Jim, likes, bananas)`
 
-- (lucy, age, 33) like the vertex with property
+- `(lucy, age, 33)` like the vertex with property
 
-- (lucy, marriedTo, alain) likes the vertex - edge - vertex
+- `(lucy, marriedTo, alain)` likes the vertex - edge - vertex
 
 *Turtle format*
 
@@ -392,16 +392,65 @@ Simplist: key value store with plain text, or value can be JSON
 
 - Bad performance on read. O(n)
 
-**Index**
+**Index**: Important trade-off
 
 - Additional structure. Doesn’t affect the contents, only affects performance of queries. 
 - Incurs overhead, especially on writes. 
 
-Important trade-off
-
 #### Hash Indexes
 
+| --              | Design                                                       | How to query                                                 | Advantage                                                    | Limitation              | Use Case                                                     |
+| --------------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ | ----------------------- | ------------------------------------------------------------ |
+| Simplist        | A hashmap in memory for offset of the data (Bitcask uses this) | find key in memory                                           | Quick look up                                                | All keys fit in the RAM | e.g. key is URL of video, value is number of time. Large write per key, not too many keys |
+| With compaction | Break the log into segments, then compact (throw away duplicate keys, keep latest) | One hash map for each segment. Search key in map starting from the most recent segment | Can merge several segments. Can be done in a background thread, while serve read/write using old, then switch |                         |                                                              |
 
+Improvements
+
+- File format
+  cvs not good. `<length of string in binary> + raw string` no need to escape
+- Deleting records
+  append a deletion record: tombstone
+- Crash recovery: in-memory hash maps lost
+  Too slow to rebuild map from segments. Store a snapshot of each hash map on disk
+- Partially written record
+  Detect with Checksums
+- Concurrency control
+  Common way: have only one writer thread.
+
+**Append-only log Pros and Cons**
+
+| Pros                                                         | Cons                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Appending, segment merging are **sequential write operations**. **Faster** especially on magnetic spinning-disk hard drives. (Also preferable on SSD) | **Large key not good**. Difficult to make an on-disk hash map perform well |
+| **Concurrency and crash recovery** are much **simpler** since segment files are append-only or immutable. (file would not contain old and new value spliced together) | **Range queries are not efficient.** For e.g. Cannot easily scan over all keys between kitty00000 and kitty99999 |
+| Merging old segments **avoids** the problem of **data files getting fragmented** over time |                                                              |
 
 #### SSTables and LSM-Trees
+
+Sorted String Table
+
+- key-value pairs is sorted by key
+- each key only appears once within each merged segment file
+
+Benefits:
+
+1. Merging: simple and efficient (*mergesort*, doesn't have to fit in memory)
+2. Finding key is easier: index can be sparse, skip some keys
+3. Can group and compress before writing into disk. Saving disk, reduce I/O bandwidth (since you need to scan several keys anyway due to 2)
+
+**Constructing and maintaining SSTables** 
+
+How to get data sorted in the first place?
+
+- Maintaining a sorted structure on disk is possible: B-Trees
+- Maintaining a sorted structure in memory is easy: red-black tree, AVL tree
+
+Steps
+
+1. write to in-memory balanced tree (called *memtable*)
+2. Bigger than threshold -> write to disk
+3. Read: check memtable, then disk segment from latest to next older
+4. Run a merging and compaction process in backgroung
+
+One problem: DB crashes. Thus a separate append-only log
 
