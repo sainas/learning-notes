@@ -663,3 +663,57 @@ Support datasets larger than memory.
 Similar to what operating systems do with virtual memory and swap files, but the database can manage memory more efficiently, smaller granularity of individual records rather than entire memory pages
 
 Storage engine design may change if non-volatile memory (NVM) technologies become more widely adopted 
+
+### Transaction Processing or Analytics?
+
+Transaction: low-latency reads and writes - as opposed to *batch processing*
+
+Doesn't have to be ACID (atomicity, consis‐ tency, isolation, and durability)
+
+OLTP: online transaction processing
+
+OLAP: online analytic processing
+
+| --              | OLTP                  | OLAP                 |
+| --------------- | --------------------- | -------------------- |
+| Read            | small records, by key | large number         |
+| Write           | random                | Bulk import / stream |
+| Used by         | End user via web app  | Interal analyst      |
+| Data represents | Latest state of data  | History              |
+| Size            | GB/TB                 | TB/PB                |
+
+#### Data Warehousing
+
+Data Warehouse: A separate database for OLAP
+
+ETL: (Extract–Transform–Load) transformed into an analysis-friendly schema, cleaned up, and then loaded into the data warehouse
+
+Advantage of using data warehouse:
+
+- No harm for performance of OLTP
+- Can be optimized for analytic access patterns
+
+**Divergence between OLTP databases and data warehouses**
+
+DB vendors focus on supporting only one, but not both
+
+#### Stars and Snowflakes: Schemas for Analytics
+
+(Even date and time are often represented using dimension tables, because this allows additional information about dates (such as public holidays) to be encoded, allowing queries to differentiate between sales on holidays and non-holidays.)
+
+| --       | Star schema                                                  | Snowflake schema                                 |
+| -------- | ------------------------------------------------------------ | ------------------------------------------------ |
+| def      | fact table + dimentional table                               | Star, but subdomains                             |
+| property | simpler to work with.(Join only happens between fact and dimentional table) | more normalized, less redundency. Need more join |
+
+### Column-Oriented Storage
+
+#### Column Compression
+
+#### Sort Order in Column Storage
+
+#### Writing to Column-Oriented Storage
+
+#### Aggregation: Data Cubes and Materialized Views
+
+### Summary
