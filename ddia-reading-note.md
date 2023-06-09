@@ -708,7 +708,68 @@ DB vendors focus on supporting only one, but not both
 
 ### Column-Oriented Storage
 
+Problem: fact table too wide. Load full row in memory is not necessary
+
+Solution: Store all the values from each column in a separate file
+
 #### Column Compression
+
+Column-Oriented is easy to compress
+
+***bitmap encoding***
+
+***bitmap index compression***
+
+Because number of distinct values **n** in a column is often smaller than total number of rows
+
+Small n:    (like country code) store one bit per row
+Larger n:  *run-length encoded*  (avoid too many zeros)
+
+```
+column values:
+aaa bbb ccc aaa ccc aaa bbb aaa
+
+bitmap
+"aaa"  [1, 0, 0, 1, 0, 1, 0, 1]
+"bbb"  [0, 1, 0, 0, 0, 0, 1, 0]
+"ccc"  [0, 0, 1, 0, 1, 0, 0, 0]
+
+
+What if there are 1000 unique values?
+"aaa" [1, ... 0, 1, 0, ... 0 ]  
+(maybe only 0.1% are 1 and 99.9% are zero )
+
+Use run-length encoded
+"aaa" -> 0, 1, 800, 1
+(means 0 zeros, 1 ones, then 800 zeros, then 1 ones, rest zeros)
+```
+
+Bitmap indexes can also help with certain queries, by bitwise operation
+
+example 1: `where product in (30, 68, 69)`
+Find bitmap of these three and calculate the OR to target the row
+
+example 2: `where product = 20 and store = 30`
+Find bitmap of these two and calculate the AND to target the row
+
+**Column families** 
+Cassandra and HBase have a concept of *column families*, but still *row-oriented*
+Within each column family, they store all columns from a row together, along with a row key, and no column compression
+
+**Memory bandwidth and vectorized processing**
+
+Big data processing bottlenecks
+
+1. bandwidth for getting data from disk into memory
+2. **bandwidth from main memory into the CPU cache**
+   - avoiding branch mispredictions and bubbles
+   - making use of single-instruction-multi-data (SIMD) instructions in modern CPUs 
+
+Column-oriented storage is also good for making efficient use of CPU cycles, because
+
+1. Query engine can iterate through column data in a tight loop (that is, with no function calls) thus much faster
+2. Column compression allows more rows to fit in the CPU cache.
+3. *Vectorized processing*: Bitwise operators can be designed to operate oncompressed column data directly
 
 #### Sort Order in Column Storage
 
