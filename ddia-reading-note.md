@@ -936,19 +936,107 @@ JSON, XML, and CSV
 - Efficiency doesn't matter that much. 
   Getting different organizations to agree on *anything* outweighs most other concerns
 
-**Binary encoding**
+**JSON Binary encoding**
 
-TODO
+JSON binary encoding: no prescribe schema, very small space reduction. Not worth loss of human-readability
+
+
 
 #### Thrift and Protocol Buffers
 
+Both require a schema
+
+Thrift: *BinaryProtocol* and *CompactProtocol*
+
+type + field tag + length indication + data
+
+CompactProtocol:
+
+- one byte for field type and tag number
+- Smaller integer use less bytes
+
+Required and optional: they make no diff on encoding. Only "required" enables a runtime check.
+
+**Schema Evolution**
+
+1. Field tags
+   - Free to change field name, but can not change field tag
+   - Adding new field:
+     - Forward compatibility: meets. Old code can ignore (datatype annotation tells it how many bytes to skip)
+     - Backward compatibility: new field can not be required. Must be optional or with a default value
+   - Removing fields:
+     - Can only remove field that is optional
+     - Can never reuse the same tag number
+2. Datatypes
+   - Risk: lose precision or get truncated.
+     e.g. 32-bit int to 64-bit int. Old code will truncate the value
+   - *Protocol Buffers* doesn't have a list or array data type.
+     It's okay to change optional field(single-valued) to repeated field(multi-valued)
+     And old code only sees the last element of the list
+   - *Thrift*: can't make the above evolution. But has the advantage of supporting nested lists
+
 #### Avro
+
+Most compact
+
+- Schema: No tag number
+- Binary data, no fields or datatypes. Only in schema
+
+Any mismatch in the schema would cause trouble
+
+**The writer’s schema and the reader’s schema**
+
+writer’s schema and reader’s schema don't have to be the same
+
+Can handle: different order, ignore fields, autofill with default value
+
+**Schema evolution rules**
+
+To maintain forward and backward compatibility, only add or remove a field with a default value
+
+Only backward compatible: adding alias for field, add one more union type
+
+**But what is the writer’s schema?**
+
+Usecase:
+
+1. Hadoop: large file with lots of record
+2. Database with individually written records
+   Version number at the beginning of encoded record, and a list of schema version
+3. Sending records over a network connection
+   Negotiate the schema version on connection setup
+
+**Dynamically generated schemas**
+
+Advantage of Avro: Friendlier to dynamically generated schemas
+
+No tag numbers. No need manual mapping and avoiding used numbers
+
+**Code generation and dynamically typed languages**
+
+Code generation are more for statically typed languages, not for dynamically typed languages, since they don't have compile-time type checker
+
+For Avro (dynamically generated schema from db table), code generation is unnecessary
+
+Avro container file is self-describing (embeds with writer's schema)
 
 #### The Merits of Schemas
 
+Many data systems also implement binary encoding:
+e.g. relational databases have a network protocol for queries/responses
+Database vendor provides a driver (e.g., using the ODBC or JDBC APIs)  decodes responses from the database’s network protocol into in-memory data structures.
 
+Pros of using schema:
 
+1. schema language are simplaer than JSON
+2. Support detailed validation rules
 
+Pros of binary coding:
+
+1. more compact (omit field names)
+2. schema is valuable doc, and guarantee to be up-to-date (unlike manually maintained doc)
+3. Keeping a database of schemas allows you to check forward/backward compatibility, before deploy
+4. Able to generate code from schema, enables type checking at compile time
 
 ### Modes of Dataflow
 
