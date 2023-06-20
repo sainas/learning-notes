@@ -1073,4 +1073,162 @@ Encoded by latest schema (you are copying the data anyway)
 
 Encode the data in an analytics-friendly column-oriented format such as Parquet
 
+#### Dataflow Through Services: REST and RPC
+
+*clients* and *servers*
+
+The API exposed by the server is known as a *service*
+
+Server can itself be a client to another service: *microservices architecture*
+
+Services are in some way like databases, but the API are predetermined
+
+**Web services**
+
+HTTP is used as protocol
+
+Not only used on the web
+
+- mobile app (native app, or JS web app using Ajax)
+- One service to another service within same organization (*middleware*)
+- One service to another service owned by different organization, via internet (public API, OAuth)
+
+REST: not a protocol but a design philosophy 
+An API designed according to the principles of REST is called RESTful.
+
+SOAP: use an XML-based language (WSDL)
+
+SOAP's Cons:
+
+- WSDL not human readable
+- Too complex and rely on tool support. Difficult to integrate if programming language not supported by SOAP vendor
+  Interoperability is not good
+
+RESTful APIs' Pros:
+
+- simpler, less code generation
+- A definition format Swagger, to describe RESTful APIs
+
+**RPC (remote procedure calls): Problems**
+
+Make a request just as calling a function "location transparency"
+
+Fundamentally flawed, because
+
+- A local function call is predictable: succeeds or fails
+  A network request is unpredictable: lost due to network problem, slowness
+
+  You need to anticipate them, e.g. by retrying
+
+- A local function call return result or throws exception (or infinite loop)
+  A network request: return without result, not return due to a timeout
+  In this case you don't know what happened to the service
+
+- If network request fails, it could be 
+
+  - Request failed
+  - Request got through, just responses are lost. 
+
+  Need to build some mechanism to make the retries *idempotence*
+
+- Local function takes about same time, network latency is unpredictable (network, load of the remote service)
+
+- Local function can use references (pointers). Network must encode/decode
+
+- Different programming language, RPC need to translate datatypes
+  Ugly because not all languages have the same type. e.g. a number > 2^53 in JS
+
+**RPC (remote procedure calls): Current directions**
+
+It isn't going away. Many frameworks built on it.
+
+New generation: distinguish remote request from local function
+*futures (promises)* to encapsulate asynchronous actions that may fail
+*service discovery*: finds the IP & port of a particular service
+
+Customer RPC with binary encoding has better performance
+But JSON is easier to debug (e.g. command-line tool `curl`, and a vast ecosystem of tools)
+
+REST is the predominant style. RPC mainly focus is between services within same organization, typically same data center
+
+**RPC (remote procedure calls): Data encoding and evolution**
+
+Servers update first, clients second, thus
+
+- Backward compatibility on requests
+- Forward compatibility on response
+
+Hard since can not force client to upgrade
+
+- Need maintain compatibility for a long time
+- If breaking change needed, ends up maintaining multiple versions of API
+
+API Versioning:
+RESTful: version in URL or HTTP header
+Or if client uses API key, store the version in DB and modified through a separate admin interface
+
+#### Message-Passing Dataflow
+
+*asynchronous message-passing*
+
+|       | REST & RPC  | Database                     | Message-Passing                                              |
+| ----- | ----------- | ---------------------------- | ------------------------------------------------------------ |
+| Speed | Immediately | Store and read in the future | In between, like both: client's request is delivered with low latency. Message not sent via direct network connection, but with an intermediary |
+
+*message broker* (*message queue* or message-oriented middleware): stores the message temporarily.
+
+Message broker Pros: (over RPC)
+
+- Act as a buffer (improve reliability)
+- Auto redeliver
+- Avoid sender needing to know IP & port of recipient (Useful in cloud, virtual machines come and go)
+- One message to several receipents
+- Logically decouple sender from recipient (sender only public message, doesn't care who consumes)
+
+Different from RPC: only one-way communication
+
+**Message brokers**
+
+producers   --publish-->  *queue* or *topic*   <--subscribe--  *consumers* or *subscribers*
+
+Many to many
+
+One topic is one-way, but a consumer can publish too, to a reply queue
+
+Typically any encoding format works
+
+If a consumer republish message, need to preserve unknown field (like the same issue in DB)
+
+**Distributed actor frameworks**
+
+*actor model*:
+
+- Each actor has local state(not shared), communicates asynchronously
+
+- Concurrency in a single process (no threads, thus no race conditions, locking, deadlock)
+
+- *Location transparency* is better than RPC since actors assumes messages might be lost
+
+*distributed actor framework*: actor + message broker
+Still need to worry about compatibility
+
 ### Summary
+
+Rolling upgrade: allows no downtime, less risky (roll back before affecting more user)
+
+These properties are hugely beneficial for "*evolvability*"
+
+Backward and forward compatibility
+(Must assume different versions are running)
+
+| Data encoding format                                         | Compatibility                                                |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Programming language–specific encodings                      | Often failed to provide                                      |
+| Textual: JSON, XML, CSV                                      | Depends. Vague on datatype thus need to be careful with numbers and binary strings |
+| Binary schema-driven format: Thrift, Protocol Buffers and Avro | Compact. Clear defined compatibility semantics. Schema can be useful doc. Code generation in statically typed language. Not human-readable |
+
+| Dataflow                     | Case                                                         |
+| ---------------------------- | ------------------------------------------------------------ |
+| Database                     | Writer encodes, reader decodes                               |
+| RPC and RESTful API          | Client encodes requests, server decodes, encodes the response. Client decodes response. |
+| Asynchronous message passing | Sender encodes, recipient decodes                            |
