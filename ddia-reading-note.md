@@ -1232,3 +1232,95 @@ Backward and forward compatibility
 | Database                     | Writer encodes, reader decodes                               |
 | RPC and RESTful API          | Client encodes requests, server decodes, encodes the response. Client decodes response. |
 | Asynchronous message passing | Sender encodes, recipient decodes                            |
+
+# PART II. Distributed Data
+
+Why multiple machine?
+
+1. Scalability
+2. Availability
+3. Latency (geo location)
+
+Scaling to Higher Load:
+
+1. Vertical scaling/Scaling up
+   - Shared-memory architecture
+     Problem: price is not linear, and efficiency gain is worst than linear
+     Not fault tolerance. (But some allows hot-swappable)
+     One geo location
+   - Shared-disk architecture
+     Used for data warehousing workloads
+     Locking is difficult to handle
+2. Horizontal scaling/Scaling out
+   - Shared-nothing architecture
+     With cloud virtual machines now multi-region is feasible for even small companies
+
+Ways to distribute data across nodes:
+
+- Replication
+- Partition
+
+## Chapter 5. Replication
+
+Why replicate?
+
+- Geographically closer to user(Lower latency)
+- failover(high availability)
+- more nodes to serve read (high read throughput)
+
+Three popular algorithms
+
+- single-leader
+- multi-leader
+- leaderless replication
+
+### Leaders and Followers
+
+1. Clients must send write request to leader. Leader writes to local storage
+2. Leader sends data to followers as *replication log* or *change stream*
+   Followers apply the writes in the same order
+3. Read can be handle by both leader and followers. Writes are only accepted on the leader
+
+Built-in feature of many db e.g. PostgreSQL, MySQL, MongoDB
+And some message queue Kafka RabbitMQ highly availability queues
+
+#### Synchronous Versus Asynchronous Replication
+
+When the leader notify the client that the update has been successful?
+Wait until the follower confirms the write: That follower is synchronous
+Not wait for the follower: That follower is asynchronous
+
+| --   | Synchronous                                                  | Asynchronous    |
+| ---- | ------------------------------------------------------------ | --------------- |
+| Pros | Guarantee consistency                                        | Not up-to-date  |
+| Cons | Leader blocks write if one follower doesn't respond (crashed or network issue) | Not block write |
+
+Impractical if all followers are synchronous
+
+*semi-synchronous:*
+
+- usually one synchronous and others async 
+  If that one sync unavailable or slow, another async is made sync
+
+- This make sure two up-to-date copies
+
+*completely asynchronous*
+
+- Write can be lost if leader failed (Weakening durability)
+- Can continue processing write even all followers fall behind
+
+Research on not losing data if leader fails:
+*chain replication*
+
+#### Setting Up New Followers
+
+Just copy is not sufficient, since data is always in flux
+Could lock the DB: against goal of high availability
+
+Process
+
+1. Snapshot leader's DB (without lock the entire db)
+2. copy snapshot to new node
+3. new node connects to leader and request data changes in between (snapshot is associated with one position in leader's replication log)
+4. New node process the backlog and *"caught up"*
+5. 
