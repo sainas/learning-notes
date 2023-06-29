@@ -1323,4 +1323,112 @@ Process
 2. copy snapshot to new node
 3. new node connects to leader and request data changes in between (snapshot is associated with one position in leader's replication log)
 4. New node process the backlog and *"caught up"*
-5. 
+
+#### Handling Node Outages
+
+e.g. Reboot to install security patch. Reboot without downtime
+
+**Follower failure: Catch-up recovery**
+
+Follower has all data change logs received from leader
+
+Request to leader for changes since the failure
+
+**Leader failure: Failover**
+
+Promote one follower
+
+- Client need to send writes to new leader
+- Other followers need to consume data from new leader
+
+This is called *failover*
+
+Steps
+
+1. Determining that the leader has failed.
+   Nodes bounce messages between each other, if no response in long time
+2. Choosing a new leader
+   Election process, or appointed by *controller node*. Consensus problem
+   Best candidate: most up-to-date
+3. Reconfiguring the system
+   If the old leader comes back, system need to handle it
+
+Failover is fraught with things that can go wrong:
+
+- asynchronous replication: data loss
+  If old leader rejoin: what to do with those writes?
+  Common solution: discard. May violate durability expectation
+
+- Discarding writes can be dangerous if other storage system coordinates with DB
+  GitHub autoincrement primary key. New leader lagged, reuse some primary keys, also used in Redis, caused private data to be disclosed to the wrong users
+- Two new leaders: *split brain*
+  data lost/corrupted. Two node accepts conflict writes
+  Solution: mechanism to shut one down. But if not careful can shut two down
+- What's the right time out for leader to be declared dead?
+  Too long: long recovery
+  Too short: unnecessary, load spike/network issue, making things worse
+
+No easy solution. Some team prefers to do failovers manual
+
+#### Implementation of Replication Logs
+
+##### 1. Statement-based replication
+
+SQL statement
+
+Cons:
+
+- nondeterministic functions: NOW()  RAND()
+- autoincrementing column, or depends on the data (UPDATE...WHERE...)
+  Must be same order, but there could be concurrent transactions
+- side effects: triggers, user-defined functions
+
+Workaround: replace nondeterministic with fixed return
+But still many edge cases
+
+##### 2. Write-ahead log (WAL) shipping
+
+Main disadvantage: log are very low level (which bytes were changed.)
+If database storage format version changes, not possible
+Follower and leader must be same version
+
+Thus can't do zero-downtime upgrade
+
+##### 3. Logical (row-based) log replication
+
+Different log format for storage and replication  (Decoupling)
+
+logical log (compared to physical data)
+
+- Insert: new value
+- Delete: info to uniquely define the row. PK if the table have one, otherwise values
+- Update: uniquely defined row, and new values of (all or changed) column
+
+Pros:
+
+- Can be kept backward compatible within different version of software or even storage engine
+- Easier for external app to parse (e.g. data warehouse, building custom indexes and cache)
+
+##### 4. Trigger-based replication
+
+1-3 are done by database system. No application code involved
+
+More overhead, but more flexible
+
+Many db have this functionality
+*triggers and stored procedures*
+
+A trigger lets you register custom application code that is automatically executed when a data change (write transaction) 
+
+
+
+### Problems with Replication Lag
+
+Leader-based replication:  Attractive for read heavy system
+
+*read-scaling* architecture: many followers (BUT must be asynchronous)
+
+But read from asyn follower would get out-dated info: temp inconsistency
+
+When the followeres catch up: eventual consistency
+
