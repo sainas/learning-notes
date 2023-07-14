@@ -1990,3 +1990,301 @@ Need distributed transaction across all partitions, some DB doesn't support
 Reality: update to global indexes are often async
 
 ### Rebalancing Partitions
+
+Need rebalance:
+
+- more throughput, need add CPU
+- more data, need add disk & RAM
+- failed machine
+
+Minimum requirement:
+
+- continue accepting reads/write
+- minimal move (disk I/O)
+
+#### Strategies for Rebalancing
+
+**Bad: Hash mod N**
+Move most data
+
+**Good: Fixed number of partition** (Hash partitioning)
+Partition by 1000, only 10 nodes. New node *steal* partition from every existing node
+Only entire partitions are moved between nodes. The number of partitions does not change
+
+Benefit: can suit different hardware
+Can assign more partitions to nodes that are more powerful
+
+Problem: fixed. Not all database support split/merge later
+Have to be high enough at early stage. But too high also cause too much overhead
+Hard to choose if dataset size varies
+
+**Dynamic partitioning** (Key range, and hash partitioning)
+
+Key-range partition: hard to decide boundaries without skew, hard to reconfig manually
+
+Dynamic partitioning (for key-range & hash partition)
+auto split, auto merge
+
+New split can be assigned to another node
+
+Benefit: number of partition adapts to the dataset size, avoiding too much overhead
+
+New db: one partition, or *pre-splitting*
+
+**Partitioning proportionally to nodes** (hash partitioning)
+
+Dynamic partitioning: proportional to the size of the dataset
+This one: proportional to the number of node
+
+Only add partition when new node joins
+
+New node: randomly chooses partitions, split, takes a half
+
+"randomly chooses" needs Hash based partition (like the consistent hashing)
+
+#### Operations: Automatic or Manual Rebalancing
+
+fully automatic <----(gradient)------>   fully manual
+
+Auto: convenient but unpredictable
+Rebalancing is expensive
+
+Combine with auto failure detection:
+One node is slow, removed, rebalanced, making situation worse
+
+### Request Routing
+
+*service discovery*
+
+Approaches:
+
+1. Client connect to random node (e.g. round-robin load balancer), that 
+
+2. A routing tier
+
+3. Client knows partitions assignment and call those nodes directly
+
+Partition assignment info is known by 1. nodes 2. routing tier 3. client
+
+Approach 1: Cassandra and Riak: *gossip protoco*l among the nodes to disseminate any changes
+
+Approach 2: 
+Many distributed data systems rely on a separate coordination service such as ZooKeeper. ZooKeeper notifies the routing tier
+
+#### Parallel Query Execution
+
+*massively parallel processing* (MPP) relational database products
+
+The MPP query optimizer breaks this complex query into a number of execution stages and partitions, which can be paralleled 
+
+### Summary
+
+To partition
+
+- Key range
+  Rebalance: dynamical partition, splitting big partition into two
+- Hash
+  Rebalance: fixed number of partitions, or dynamical partitioning
+
+Hybrid approach:
+compound key: one part to partition, another to sort
+
+Secondary index
+
+- Document-partitioned indexes (local index)
+  read from all, scatter/gather, write to only one
+- Term-partitioned indexes (global index)
+  read from only one, more overhead on write
+
+## Chapter 7. Transactions
+
+Why transaction?
+Things can go wrong:
+
+- db failed (software/hardware)
+- app crashes
+- Interrupted network
+- Clients write concurrently
+- Client read partially updated data
+- Race conditions
+
+*Transaction*: simplify the issue
+
+What is transaction?
+"a way for an application to group several reads and writes together into a logical unit" either all succeeded or fails
+No partial failure
+
+When to use transaction?
+Sometimes abandon for higher performance / availability
+
+#### The Slippery Concept of a Transaction
+
+X Not true to say "transactions were the antithesis of scalability"
+
+X Not true to say "transactional guarantees essential requirement for “serious applications” with “valuable data.”
+
+both are hyperbole
+
+##### The Meaning of ACID
+
+Atomicity, Consistency, Isolation, and Durability.
+
+But "isolation" is pretty ambiguous
+
+**Atomicity**
+
+Can mean different things
+
+In multi-threaded programming:
+
+- Another thread can not see the half-finished result of an atomic operation
+
+In DB: not about concurrency
+
+- Multiple writes, either committed, or aborted and undo
+
+Ensure aborted transaction didn't change anything
+Safe to retry
+
+**Consistency**
+
+It is terribly overloaded
+
+- In replica: eventual consistency
+- In partitioning: consistent hashing
+- CAP: consistency means linearizability
+- ACID: db "being in a good state"
+
+Invariants are always satisfied
+e.g. in accounting, credits and debits are balanced.
+the db stays valid before and after the transaction
+
+It's a property of the application
+
+**`C -> application`**
+**`A, I, D -> database`**
+application needs to rely on db's ` A I` to achieve `C`
+
+**Isolation**
+
+About Concurrency and race condition
+
+"Concurrently executing transactions are isolated from each other"
+
+textbook formalized isolation as *serializability*
+
+"Each transaction can pretend that it's the only transaction running on the entire DB. Result is the same as if they had run serially"
+
+Serializable isolation is rarely used
+Since it carries a performance penalty
+
+Some weaker guarantees are used
+
+**Durability**
+
+"Once a transaction is committed, data will not be lost even a hardware fault or db crash"
+
+Single-node DB: means written to nonvolatile storage (hard drive/SDD) and has write-ahead log for recovery
+
+Replicated DB: means data has been copied to some number of nodes, then report transaction committed
+
+Perfect durability doesn't exist: all disks are destroyed, nothing can save
+
+Replication and durability
+
+- Power outages: crash all nodes. All data in memory are lost. Thus we still want to write into disk for in-memory db
+- Leader unavailable: async replica lost recent writes
+- Hardware: 
+  - bugs. SSD sometimes violates the guarantees if suddenly loses power
+  - SSD bad block
+  - SSD start losing data without power, depending on temperature
+- Storage engine and filesystem bugs
+- Data corrupted gradually, and so does replicas/recent backup. (Can be fixed by restoring historical backups)
+
+##### Single-Object and Multi-Object Operations
+
+Atomicity: no partial failure
+Isolation: concurrent transactions don't interfere
+
+multi-object transactions:
+
+- dirty read
+  e.g. new email come in, in the mean time, the unread need to add 1. Another transaction read in between
+
+Need way to determining which read and write are the same transaction
+
+- Client TCP connection      BEGIN TRANSACTION and COMMIT
+  (Not ideal since TCP connection can be interrupt)
+- transaction manager can group operations by a unique transaction identifier
+
+Many nonrelational database don't have such grouping (even *multi-put* can update several key's, not transaction semantics)
+
+**Single-object writes**
+
+Maintaining atomicity and isolation when write single object, even
+
+- network interrupted
+- power fails
+- Other client read while writing
+
+Storage engines mostly aim to provide it
+
+- Atomicity: WAL for crash recovery
+- Isolation: lock on each object
+
+More conplex atomic operation
+
+- increment operation 
+  (replace read-modify-write cycle in prev example of new unread email)
+- compare-and-set
+
+But this is not "transaction" (miscalled for marketing purposes)
+Transaction is about grouping multiple operations on multiple objects
+
+**The need for multi-object transactions**
+
+Do we need multi-object transactions at all?
+
+Cases:
+
+- Foreign key
+  Ensure valid
+- Document db (denormalized)
+  often single object.
+  Can't join -> denormalized
+  When denormalized data updated, ensure all related document are updated in one go
+- Secondary index
+  Avoid record in one index not in another
+
+**Handling errors and aborts**
+
+ACID -> drop partial result
+Leaderless -> best effort
+
+How to retry aborted transaction
+
+- Network issue, retry would execute twice
+
+- Overload. Make things worse
+  Solution: exponential backoff, or handle overload error differently
+
+- If not transient error like constraint violation, not worth retry
+
+- Side effect: e.g. sending email
+  Solution to coordinate several system in transaction: Two-phase commit
+
+- Client process fails, data lost
+
+  
+
+#### Weak Isolation Levels
+
+Serializable isolation: make developing easy, but have performance cost
+
+Many databases only supports *weaker levels of isolation*
+
+They can only prevent *some* concurrency issue
+
+Concurrency bugs caused by  *weaker levels of isolation*:
+e.g.“Use an ACID database if you’re handling financial data!”
+This is wrong because many popular relational database systems are "ACID" but use weak isolation which is not enough
