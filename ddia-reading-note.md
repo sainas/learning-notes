@@ -2288,3 +2288,125 @@ They can only prevent *some* concurrency issue
 Concurrency bugs caused by  *weaker levels of isolation*:
 e.g.“Use an ACID database if you’re handling financial data!”
 This is wrong because many popular relational database systems are "ACID" but use weak isolation which is not enough
+
+##### Read Committed
+
+- **No dirty read:** only read committed
+  Why important? Avoid reading inconsistent partial update, or changes that may roll back due to abort
+
+- **No dirty write:** only overwrite committed
+  Can do: e.g. sell car, update listing table and send invoice. Avoid doing it on two customers
+  Can not do: Lost Updates in race condition, e.g. increase counter
+
+**Implementing read committed**
+
+Dirty write: 
+Row level lock
+
+Dirty read: 
+lock doesn't work well, since long transaction blocks read
+Most DB: remember both old and new value
+
+##### Snapshot Isolation and Repeatable Read
+
+e.g.
+Transfer money, Account A +100, Account B -100
+
+The transaction succeeded. But the read process, read A before transaction, read B after transaction, and the total balance doesn't match
+
+*nonrepeatable read* or *read skew*
+If read again will get different result
+
+Case that cannot tolerate this case:
+
+- Backup process
+- Analytic queries and integrity checks
+
+*Snapshot isolation*
+
+**Implementing snapshot isolation**
+
+write lock, No read lock
+
+Key principle of snapshot isolation: readers writers never blocks each other
+
+Need to keep **multiple** versions
+(*Read committed*: only two versions)
+
+*multi-version concurrency control (MVCC)*
+
+Each transaction has a unique incremental ID
+
+created_by IDxxx, deleted_by IDxxx
+
+Garbage collection
+
+**Visibility rules for observing a consistent snapshot**
+
+Ignore on-going, aborted, and larger transactions
+
+**Indexes and snapshot isolation**
+
+Approach 1: Index point to all versions, query need filter on transaction id.
+Optimization: PostgreSQL not update index if different versions on the same page
+
+Approach 2: Some DB use B-tree but use *append-only/copy-on-write*. The query doesn't need to filter index since every transaction creates a new root
+
+**Repeatable read and naming confusion**
+
+"Repeatable read" refers to different things in different db
+(Let's just use snapshot isolation to be clear)
+
+#### Preventing Lost Updates
+write-write conflict
+1. No dirty write (previously talked about)
+2. Lost update (most famous)
+
+The later write clobbers the earlier write
+
+examples
+1. counter add 1, race condition. Should add 2 in total but only add 1
+Or update account balance
+(Read -> calculate -> write)
+2. Change a complex value
+e.g. Add element to list in JSON
+(Read -> parse Json -> modify -> write)
+3. Two user edit wiki page, saving changes by sending entire page to server and overwriting
+
+##### Atomic write operations
+
+`UPDATE counters SET value = value + 1 WHERE key = 'foo';`
+
+This is concurrency-safe in most relational DB
+
+If the code can be expressed in terms of atomic operation
+(e.g. editing a wiki page can NOT)
+But ORM makes it easy to accidentally write code that are not atomic operation
+
+Implementation
+a. exclusive lock (*cursor stability*)
+b. force to be executed on single thread
+
+##### Explicit locking
+
+```sql
+BEGIN TRANSACTION; 
+SELECT * FROM figures WHERE name = 'robot' AND game_id = 222 FOR UPDATE;
+-- Check whether move is valid, then update the position 
+-- of the piece that was returned by the previous SELECT. UPDATE figures SET position = 'c4' WHERE id = 1234;
+COMMIT;
+```
+
+ The FOR UPDATE clause indicates that the database should take a lock on all rows returned by this query
+
+##### Automatically detecting lost updates
+
+1. force single thread
+2. Try run in parallel, if transaction manager detects lost update, then retry
+
+Pros: efficient
+
+But MySQL/InnoDB does not detect lost updates
+
+It's a great feature, since no application code required.
+You may forget to use  lock
